@@ -129,7 +129,7 @@ void mat_random(MAT* mat) { //Nahodne generovanie prvkov matice (Випадко�
 void mat_print(MAT* mat) { //Vystup prvkov matice (Вивід елементів матриці)
     for (unsigned int i = 0; i < mat->riadok; i++) {
         for (unsigned int j = 0; j < mat->stlpec; j++) {
-            printf("%6.3f\t", ELEM(mat, i, j));
+            printf("%6.2f\t", ELEM(mat, i, j));
         }
         printf("\n");
     }
@@ -145,23 +145,18 @@ void mat_destroy(MAT* mat) { //Uvolnenie pamati (Звільнення пам'я�
 
 
 
-MAT* mat_multiply(MAT* mat1, MAT* mat2) {
-    if (mat1->stlpec != mat2->riadok) {
-        printf("Помилка: Некоректні розміри матриць для матричного множення.\n");
-        return NULL;
-    }
-
+MAT* mat_multiply(MAT* mat1, MAT* mat2) { //Vypocet sucinu matic (Вираховування добутку матриць)
     unsigned int m = mat1->riadok;
     unsigned int n = mat1->stlpec;
     unsigned int p = mat2->stlpec;
 
     MAT* result = mat_create_with_type(m, p);
     if (result == NULL) {
-        printf("Помилка: Не вдалося створити матрицю для результату.\n");
+        printf("Chyba: Nepodarilo sa vytvorit maticu pre vysledok.\n");
         return NULL;
     }
 
-    for (unsigned int i = 0; i < m; i++) {
+    for (unsigned int i = 0; i < m; i++) { 
         for (unsigned int j = 0; j < p; j++) {
             float sum = 0.0;
             for (unsigned int k = 0; k < n; k++) {
@@ -176,7 +171,7 @@ MAT* mat_multiply(MAT* mat1, MAT* mat2) {
 
 
 
-MAT* mat_transpose(const MAT* mat) {
+MAT* mat_transpose(const MAT* mat) { //Transponovanie matice (Транспонування матриці)
     MAT* transposed = mat_create_with_type(mat->stlpec, mat->riadok);
     if (transposed == NULL) {
         printf("Chyba pri vytvarani transponovanej matice.\n");
@@ -197,14 +192,13 @@ MAT* mat_transpose(const MAT* mat) {
 MAT* mat_orthogonalize(const MAT* mat) {
     unsigned int n = mat->riadok;
 
-    // Створення нової матриці для збереження результату ортогоналізації
     MAT* orthogonalized = mat_create_with_type(mat->stlpec, mat->riadok);
     if (orthogonalized == NULL) {
         printf("Chyba pri vytvarani ortogonalizovanej matice.\n");
         return NULL;
     }
 
-    // Копіювання вхідної матриці до нової матриці
+    // Kopirovanie vstupnej matice do novej matice (Копіювання вхідної матриці до нової матриці)
     for (unsigned int i = 0; i < mat->riadok; i++) {
         for (unsigned int j = 0; j < mat->stlpec; j++) {
             ELEM(orthogonalized, i, j) = ELEM(mat, i, j);
@@ -212,7 +206,7 @@ MAT* mat_orthogonalize(const MAT* mat) {
     }
 
     for (unsigned int i = 0; i < n; i++) {
-        // Віднімання проекцій векторів на попередні базисні вектори
+        // Odcitanie projekcii vektorov na predchadzajuce bazove vektory
         for (unsigned int j = 0; j < i; j++) {
             float dot_product = 0.0;
 
@@ -225,7 +219,7 @@ MAT* mat_orthogonalize(const MAT* mat) {
             }
         }
 
-        // Нормалізація вектора
+        // Normalizacia vektorov (Нормалізація вектора)
         float norm = 0.0;
         for (unsigned int k = 0; k < n; k++) {
             norm += ELEM(orthogonalized, k, i) * ELEM(orthogonalized, k, i);
@@ -244,23 +238,88 @@ MAT* mat_orthogonalize(const MAT* mat) {
 
 
 
-// Обчислення характеристичного поліному
+/*Hladanie charakteristickeho polynomu sa realizuje prostrednictvom principu "Schurovho rozkladu", kde vzorec je Ai+1 = Q*i.A.Q,
+kde Ai+1 je dalsia matica, ktora je podobnejsia hornej trojuholnikovej matici ako Ai, ale tolko do pevneho i, Q je ortogonalizovana matica A a Q* je
+transponovana matica Q. Ide o to, ze mame aj vzorec R = Q*.A, kde R je horna trojuholnikova matica s vlastnymi hodnotami A na diagonale. 
+Iteracie Ai+1 = Q*i.A.Q su potrebne na to, aby sa vlastne hodnoty diagonaly R co najviac priblizili realnym vlastnym hodnotam A*/
 char mat_characteristic_polynomial(MAT* mat, float* coef) {
-    
+    int i, j, ii, jj;
+    unsigned int n = mat->riadok;
+    MAT* A = mat_create_with_type(n, n); // Kopia vstupnej matice (Копія вхідної матриці)
+    MAT* Q; //ortogonalna A
+    MAT* R = mat_create_with_type(n, n); // Trojholnikova horna matica (Верхньо-трикутникова матриця)
+    MAT* T = mat_create_with_type(n, n); // Transponovana Q
+
+    // Kopirovanie vstupnej matice do novej matice (Копіювання вхідної матриці до нової матриці)
+    for (unsigned int i = 0; i < mat->riadok; i++) {
+        for (unsigned int j = 0; j < mat->stlpec; j++) {
+            ELEM(A, i, j) = ELEM(mat, i, j);
+        }
+    }
+
+    //Vypocet poctu nul v hornej trojuholnikovej diagonale (pocet prvkov pod diagonalou) (Обчислення кількості нулів у верхньо трикутній діагоналі(к-сть елементів під діагоналлю))
+    int k = 0;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            if (i > j) {
+                k++;
+            }
+        }
+    }
+    printf("\n k = %i\n", k);
+    float presnost = 0.01; // Prahova hodnota presnosti (Порогове значення точності)
+
+    // Vykonavanie procesu dosahovania presnosti (Виконання процесу досягнення точності)
+    for (i = 0; ; i++)
+    {
+
+        Q = mat_orthogonalize(A);
+        T = mat_transpose(Q);
+        A = mat_multiply(T, A);
+        A = mat_multiply(A, Q);
+        R = mat_multiply(T, A); //Vypocet iteracnych prvkov (Обчислення елементів ітерації)
+        //mat_print(R);
+        int je_podobne = 0;
+
+        for (ii = 0; ii < n; ii++) {
+            for (jj = 0; jj < n; jj++) {
+                if (ii > jj) {
+                    if (fabs(ELEM(R, ii, jj)) < presnost)
+                        je_podobne++; //Sucet poctu prvkov R pod diagonalou, ktore su mensie ako presnost (Кількість елементів матриці R рід діагоналлю, які менші за коефіцієнт точності)
+                }
+                //coef[ii] = ELEM(R, ii, ii);
+            }
+        }
+        if (je_podobne == k) {
+            break; // Zastavenie cyklu po dosiahnuti pozadovanej presnosti (Зупиняємо цикл, якщо досягнута потрібна точність)
+        }
+    }
+    R = mat_multiply(T, A);
+    printf("Iteracia %i je najlepsia, pri ktorej matica R je najviac podobna hornej trojuholnikovej matici s presnostou \"nulovych\" prvkov do %f absolutnej hodnoty,\nA\n", i, presnost);
+    mat_print(A);
+    for (i = 0; i < n; i++) // Zapis charakterestickeho polynomu
+    {
+        coef[i] = ELEM(R, i, i);
+    }
+    printf("R\n");
+    mat_print(R);
+
+    mat_destroy(A);
+    mat_destroy(T);
+    mat_destroy(Q);
+    mat_destroy(R);
+    return 1;
 }
 
-
-
 int main() {
+    int i;
     char* f = "matica.bin";
     MAT* matica;
-    MAT* ort_matica;
-    MAT* diagon;
-    MAT* transpo;
     unsigned int riadok, stlpec, var;
     printf("Rozmernost matice, matica je kvadraticka -> ");
     scanf("%i", &riadok);
     stlpec = riadok;
+    float* coef = (float*)malloc((stlpec + 1) * sizeof(float));
     if (riadok != stlpec) 
     {
         printf("Matica nie je kvadraticka!\n");
@@ -301,7 +360,7 @@ int main() {
     // Vystup matice (Виведення матриці) 
     mat_print(matica);
 
-    char subor_ano = mat_save(matica, f); //Vystup prvkov matice (Вивід елементів матриці)
+    char subor_ano = mat_save(matica, f); 
     if (subor_ano) {
         printf("Matica je uspesne ulozena v subore.\n");
     }
@@ -310,48 +369,19 @@ int main() {
         return 0;
     }
 
-    float* coef = (float*)malloc((stlpec + 1) * sizeof(float));
+    printf("Proces Ai+1 = Q*i.A.Q,\n");
+    mat_characteristic_polynomial(matica, coef);
 
-    char polynom_ano = mat_characteristic_polynomial(matica, coef); //Vystup prvkov matice (Вивід елементів матриці)
+    char polynom_ano = mat_characteristic_polynomial(matica, coef); 
     if (!polynom_ano) {
-        printf("Помилка: Не вдалося обчислити характеристичний поліном.\n");
+        printf("Chyba: Charakteristicky polynom sa nepodarilo vypocitat.\n");
         return 0;
     }
-    int i;
     printf("Polynom: ");
     for (i = 0; i < stlpec; i++)
     {
-        printf("%6.2f ", coef[i]);
+        printf("%6.5f ", coef[i]);
     }
-
-    printf("\n");
-    ort_matica = mat_orthogonalize(matica);
-    mat_print(ort_matica);
-
-    diagon = mat_create_with_type(riadok, stlpec);
-    if (diagon == NULL) {
-        printf("Chyba pri vytvarani matice \n");
-        return 1;
-    }
-    printf("Diagonalna matica\n");
-    mat_unit(diagon);
-    mat_print(diagon);
-    printf("Vstup matica * diag matica\n");
-    diagon = mat_multiply(matica, diagon);
-    mat_print(diagon);
-
-    transpo = mat_create_with_type(riadok, stlpec);
-    if (transpo == NULL) {
-        printf("Chyba pri vytvarani matice \n");
-        return 1;
-    }
-    transpo = mat_transpose(ort_matica);
-    printf("Transp ort matica\n");
-    mat_print(transpo);
-
-    matica = mat_multiply(transpo, ort_matica);
-    printf("Sucin transp ort zo ort = velmi blizke ku jednotkovej\n");
-    mat_print(matica);
 
     free(coef);
     mat_destroy(matica); //Uvolnenie pamati (Звільнення пам'яті)
