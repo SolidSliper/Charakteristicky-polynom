@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <math.h>
 #define ELEM(mat, i, j) ((mat)->elem[(i) * (mat)->stlpec + (j)])
+#define FILE_OPEN_ERROR -1
+#define HEADER_ERROR -2
+#define READ_SIZE_ERROR -3
+#define MATRIX_CREATE_ERROR -4
+#define MATRIX_CSV_TABLE_ERROR -5
 
 //Ak v komentaroch vidite nejasne znaky, je to ukrajincina
 //https://matrixcalc.org/vectors.html
@@ -20,7 +25,7 @@ void mat_destroy(MAT* mat) { //Uvolnenie pamati (Звільнення пам'я�
 MAT* mat_create_with_type(unsigned int riadok, unsigned int stlpec) {
     MAT* mat = (MAT*)malloc(sizeof(MAT));
     if (mat == NULL) {
-        return NULL;  // Chyba pri pridelovani pamate (Помилка виділення пам'яті)
+        return MATRIX_CREATE_ERROR;  // Chyba pri pridelovani pamate (Помилка виділення пам'яті)
     }
 
     mat->riadok = riadok;
@@ -28,43 +33,37 @@ MAT* mat_create_with_type(unsigned int riadok, unsigned int stlpec) {
     mat->elem = (float*)malloc(riadok * stlpec * sizeof(float));
     if (mat->elem == NULL) {
         free(mat);  // Chyba pri pridelovani pamate, uvolnenie pamate mat (Помилка виділення пам'яті, звільнення пам'яті mat)
-        return NULL;
+        return MATRIX_CREATE_ERROR;
     }
 
     return mat;
 }
 
 
-MAT* mat_create_by_file(char* f, int n) {
+MAT* mat_create_by_file(char* f) {
     FILE* file = fopen(f, "rb"); //Otvaranie suboru (Відкриття файлу)
     if (file == NULL) {
-        return -3;
+        return FILE_OPEN_ERROR;
     }
 
     // Kontrola prvych dvoch bajtov (Перевірка перших двох байтів)
     char header[2];
     if (fread(header, sizeof(char), 2, file) != 2 || header[0] != 'M' || header[1] != '1') {
         fclose(file);
-        return -4;
+        return HEADER_ERROR;
     }
 
     // Ziskanie poctu riadkov a stlpcov (Отримання кількості рядків і стовпців)
     unsigned int riadok, stlpec;
     if (fread(&riadok, sizeof(unsigned int), 1, file) != 1 || fread(&stlpec, sizeof(unsigned int), 1, file) != 1) {
         fclose(file);
-        return -5;
-    }
-
-    if (riadok != n)
-    {
-        fclose(file);
-        return -6;
+        return READ_SIZE_ERROR;
     }
 
     MAT* matica = mat_create_with_type(riadok, stlpec); //(Ініціалізація матриці)
     if (matica == NULL) {
         fclose(file);
-        return -7;
+        return MATRIX_CREATE_ERROR;
     }
 
     // Citanie prvkov matice zo suboru (Зчитування елементів матриці з файлу)
@@ -73,7 +72,7 @@ MAT* mat_create_by_file(char* f, int n) {
         fclose(file);
         free(matica->elem);
         mat_destroy(matica);
-        return -8;
+        return MATRIX_CREATE_ERROR;
     }
 
     fclose(file);
@@ -85,7 +84,7 @@ MAT* mat_create_by_file(char* f, int n) {
 char mat_save(MAT* mat, char* f) {
     FILE* file = fopen(f, "wb");
     if (file == NULL) {
-        return -9; // Chyba pri otvarani suboru (Помилка при відкритті файлу)
+        return FILE_OPEN_ERROR; // Chyba pri otvarani suboru (Помилка при відкритті файлу)
     }
 
     // Zaznamenanie nazvu(header)
@@ -108,7 +107,7 @@ char mat_save(MAT* mat, char* f) {
 void mat_csv(const MAT* matica, const char* filename) { //https://matrixcalc.org/vectors.html
     FILE* file = fopen(filename, "w");
     if (file == NULL) {
-        return -13;
+        return MATRIX_CSV_TABLE_ERROR;
     }
 
     for (unsigned int i = 0; i < matica->riadok; i++) {
@@ -161,6 +160,8 @@ void mat_print(MAT* mat) { //Vystup prvkov matice (Вивід елементів
     printf("\n");
 }
 
+
+
 MAT* mat_multiply(MAT* mat1, MAT* mat2) { //Vypocet sucinu matic (Вираховування добутку матриць)
     unsigned int m = mat1->riadok;
     unsigned int n = mat1->stlpec;
@@ -168,7 +169,7 @@ MAT* mat_multiply(MAT* mat1, MAT* mat2) { //Vypocet sucinu matic (Вирахов
 
     MAT* result = mat_create_with_type(m, p);
     if (result == NULL) {
-        return -10;
+        return MATRIX_CREATE_ERROR;
     }
 
     for (unsigned int i = 0; i < m; i++) { 
@@ -186,10 +187,71 @@ MAT* mat_multiply(MAT* mat1, MAT* mat2) { //Vypocet sucinu matic (Вирахов
 
 
 
+MAT* mat_subtract(MAT* mat1, MAT* mat2) { //Odpocitovanie matic
+    if (mat1->riadok != mat2->riadok || mat1->stlpec != mat2->stlpec) {
+        // Помилка: розміри матриць не співпадають
+        return MATRIX_CREATE_ERROR;
+    }
+
+    MAT* result = mat_create_with_type(mat1->riadok, mat1->stlpec);
+    if (result == NULL)
+    {
+        return MATRIX_CREATE_ERROR;
+    }
+
+    for (unsigned int i = 0; i < mat1->riadok; i++) {
+        for (unsigned int j = 0; j < mat1->stlpec; j++) {
+            ELEM(result, i, j) = ELEM(mat1, i, j) - ELEM(mat2, i, j);
+        }
+    }
+
+    return result;
+}
+
+
+
+float mat_determinant(MAT* mat) {
+    unsigned int n = mat->riadok;
+    int i, j, k;
+
+    if (n == 1) {
+        // Для матриці 1x1 детермінант дорівнює єдиному елементу
+        return ELEM(mat, 0, 0);
+    }
+
+    float det = 0.0;
+    int sign = 1;
+
+    for (j = 0; j < n; j++) {
+        MAT* submatrix = mat_create_with_type(n - 1, n - 1);
+
+        for (i = 1; i < n; i++) {
+            unsigned int subi = 0;
+            for (k = 0; k < n; k++) {
+                if (k != j) {
+                    ELEM(submatrix, subi, i - 1) = ELEM(mat, i, k);
+                    subi++;
+                }
+            }
+        }
+
+        float subdet = mat_determinant(submatrix);
+        det += sign * ELEM(mat, 0, j) * subdet;
+
+        sign = -sign;
+
+        mat_destroy(submatrix);
+    }
+
+    return det;
+}
+
+
+
 MAT* mat_transpose(const MAT* mat) { //Transponovanie matice (Транспонування матриці)
     MAT* transposed = mat_create_with_type(mat->stlpec, mat->riadok);
     if (transposed == NULL) {
-        return -11;
+        return MATRIX_CREATE_ERROR;
     }
 
     for (unsigned int i = 0; i < mat->riadok; i++) {
@@ -208,7 +270,7 @@ MAT* mat_orthogonalize(const MAT* mat) {
 
     MAT* orthogonalized = mat_create_with_type(mat->stlpec, mat->riadok);
     if (orthogonalized == NULL) {
-        return -12;
+        return MATRIX_CREATE_ERROR;
     }
 
     // Kopirovanie vstupnej matice do novej matice (Копіювання вхідної матриці до нової матриці)
@@ -308,9 +370,22 @@ char mat_characteristic_polynomial(MAT* mat, float* coef) {
     }
     printf("Iteracia %i je najlepsia, pri ktorej matica R je najviac podobna hornej trojuholnikovej matici s presnostou \"nulovych\" prvkov do %f absolutnej hodnoty,\nA\n", i, presnost);
     mat_print(A);
-    for (i = 0; i < n; i++) // Zapis charakterestickeho polynomu
+    for (i = 0; i < n; i++) // Vypocet koeficientov charakteristickeho polynomu (Обчислення коефіцієнтів характеристичного поліному)
     {
-        coef[i] = ELEM(A, i, i);
+        MAT* lambdaI = mat_create_with_type(n, n);
+        for (j = 0; j < n; j++) {
+            for (k = 0; k < n; k++) {
+                ELEM(lambdaI, j, k) = (j == k) ? ELEM(A, i, i) : 0;
+            }
+        }
+        
+        MAT* diff = mat_subtract(A, lambdaI);
+        float det = mat_determinant(diff);
+
+        coef[i] = det;
+
+        mat_destroy(lambdaI);
+        mat_destroy(diff);
     }
     printf("R\n"); //zaujimave, ze na diagonale R je vlaste cisla A, ale oni su vsetke kladne!!!
     mat_print(R);
@@ -322,44 +397,63 @@ char mat_characteristic_polynomial(MAT* mat, float* coef) {
     return 1;
 }
 
+
+//
+//void mat_characteristic_polynomial(MAT* mat, float* coef) {
+//    unsigned int n = mat->riadok;
+//
+//    if (n != mat->stlpec) {
+//        // Помилка: матриця не є квадратною
+//        return;
+//    }
+//
+//    MAT* identity = mat_create_with_type(n, n);
+//    mat_unit(identity);
+//    MAT* A_minus_lambdaI = mat_subtract(mat, identity);
+//
+//    float det;
+//    for (unsigned int i = 0; i < n; i++) {
+//        MAT* submatrix = mat_create_with_type(n - 1, n - 1);
+//
+//        for (unsigned int j = 1; j < n; j++) {
+//            for (unsigned int k = 0; k < n; k++) {
+//                if (k != i) {
+//                    ELEM(submatrix, j - 1, k < i ? k : k - 1) = ELEM(A_minus_lambdaI, j, k);
+//                }
+//            }
+//        }
+//
+//        det = mat_determinant(submatrix);
+//        coef[i] = -det;
+//
+//        mat_destroy(submatrix);
+//    }
+//
+//    coef[n] = 1.0;
+//
+//    mat_destroy(identity);
+//    mat_destroy(A_minus_lambdaI);
+//}
+
+
+
 int mat_error(int err)
 {
     switch (err)
     {
-    case NULL:
-        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu\n");
+    case -1:
+        printf("Chyba: Otvorenie suboru zlyhalo\n");
         return 0;
-    case -3:
-        printf("Chyba: Otvorenie suboru na zapis zlyhalo\n");
-        return 0;
-    case -4:
+    case -2:
         printf("Chyba: Chyba: Zapis typu matice v subore je nespravny\n");
         return 0;
+    case -3:
+        printf("Chyba: Nie je mozne urcit velkost matice zo suboru\n");
+        return 0;
+    case -4:
+        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu\n");
+        return 0;
     case -5:
-        printf("Chyba: Matica v subore nie je kvadraticka\n");
-        return 0;
-    case -6:
-        printf("Chyba: Rozmernost matice zo suboru je rozna od vasej\n");
-        return 0;
-    case -7:
-        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu zo suboru\n");
-        return 0;
-    case -8:
-        printf("Chyba: Pocet prvkov matice sa lisi od vasej poziadavky\n");
-        return 0;
-    case -9:
-        printf("Chyba: Otvorenie suboru na ulozenie matice zlyhalo\n");
-        return 0;
-    case -10:
-        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu sucinu\n");
-        return 0;
-    case -11:
-        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu transponovania\n");
-        return 0;
-    case -12:
-        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu ortogonalizacii\n");
-        return 0;
-    case -13:
         printf("Chyba: Nepodarilo sa pridelit pamat pre zapis matice do tabulky\n");
         return 0;
     default:
@@ -434,13 +528,12 @@ int main() {
     }
 
     printf("Proces Ai+1 = Q*i.A.Q,\n");
-    mat_characteristic_polynomial(matica, coef);
-
     char polynom_ano = mat_characteristic_polynomial(matica, coef); 
     if (!polynom_ano) {
         printf("Chyba: Charakteristicky polynom sa nepodarilo vypocitat.\n");
         return 0;
     }
+
     printf("Polynom: ");
     for (i = 0; i < stlpec; i++)
     {
