@@ -4,6 +4,7 @@
 #define ELEM(mat, i, j) ((mat)->elem[(i) * (mat)->stlpec + (j)])
 
 //Ak v komentaroch vidite nejasne znaky, je to ukrajincina
+//https://matrixcalc.org/vectors.html
 typedef struct {
     unsigned int riadok;
     unsigned int stlpec;
@@ -11,6 +12,10 @@ typedef struct {
 } MAT;
 
 
+void mat_destroy(MAT* mat) { //Uvolnenie pamati (Звільнення пам'яті)
+    free(mat->elem);
+    free(mat);
+}
 
 MAT* mat_create_with_type(unsigned int riadok, unsigned int stlpec) {
     MAT* mat = (MAT*)malloc(sizeof(MAT));
@@ -30,45 +35,45 @@ MAT* mat_create_with_type(unsigned int riadok, unsigned int stlpec) {
 }
 
 
-
-MAT* mat_create_by_file(char* f) {
+MAT* mat_create_by_file(char* f, int n) {
     FILE* file = fopen(f, "rb"); //Otvaranie suboru (Відкриття файлу)
     if (file == NULL) {
-        printf("Chyba pri otvarani suboru.\n");
-        return NULL;
+        return -3;
     }
 
     // Kontrola prvych dvoch bajtov (Перевірка перших двох байтів)
     char header[2];
     if (fread(header, sizeof(char), 2, file) != 2 || header[0] != 'M' || header[1] != '1') {
-        printf("Nespravny format suboru.\n");
         fclose(file);
-        return NULL;
+        return -4;
     }
 
     // Ziskanie poctu riadkov a stlpcov (Отримання кількості рядків і стовпців)
     unsigned int riadok, stlpec;
     if (fread(&riadok, sizeof(unsigned int), 1, file) != 1 || fread(&stlpec, sizeof(unsigned int), 1, file) != 1) {
-        printf("Chyba pri citani rozmerov matice.\n");
         fclose(file);
-        return NULL;
+        return -5;
+    }
+
+    if (riadok != n)
+    {
+        fclose(file);
+        return -6;
     }
 
     MAT* matica = mat_create_with_type(riadok, stlpec); //(Ініціалізація матриці)
     if (matica == NULL) {
-        printf("Chyba pri vytvarani matice.\n");
         fclose(file);
-        return NULL;
+        return -7;
     }
 
     // Citanie prvkov matice zo suboru (Зчитування елементів матриці з файлу)
     unsigned int num_elements = riadok * stlpec;
     if (fread(matica->elem, sizeof(float), num_elements, file) != num_elements) {
-        printf("Chyba pri citani prvkov matice. \n");
         fclose(file);
         free(matica->elem);
-        free(matica);
-        return NULL;
+        mat_destroy(matica);
+        return -8;
     }
 
     fclose(file);
@@ -80,7 +85,7 @@ MAT* mat_create_by_file(char* f) {
 char mat_save(MAT* mat, char* f) {
     FILE* file = fopen(f, "wb");
     if (file == NULL) {
-        return 0; // Chyba pri otvarani suboru (Помилка при відкритті файлу)
+        return -9; // Chyba pri otvarani suboru (Помилка при відкритті файлу)
     }
 
     // Zaznamenanie nazvu(header)
@@ -98,6 +103,28 @@ char mat_save(MAT* mat, char* f) {
     return 1; 
 }
 
+
+
+void mat_csv(const MAT* matica, const char* filename) { //https://matrixcalc.org/vectors.html
+    FILE* file = fopen(filename, "w");
+    if (file == NULL) {
+        return -13;
+    }
+
+    for (unsigned int i = 0; i < matica->riadok; i++) {
+        for (unsigned int j = 0; j < matica->stlpec; j++) {
+            fprintf(file, "%.2f", ELEM(matica, i, j));
+            if (j < matica->stlpec - 1) {
+                fprintf(file, ",");
+            }
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+}
+
+
 void mat_unit(MAT* mat) { //Generovanie jednotkovej matice (Генерування одиничної матриці)
     for (unsigned int i = 0; i < mat->riadok; i++) {
         for (unsigned int j = 0; j < mat->stlpec; j++) {
@@ -114,8 +141,6 @@ void mat_unit(MAT* mat) { //Generovanie jednotkovej matice (Генеруванн
 
 
 void mat_random(MAT* mat) { //Nahodne generovanie prvkov matice (Випадкова генерація елементів матриці)
-    srand(time(NULL));
-
     for (unsigned int i = 0; i < mat->riadok; i++) {
         for (unsigned int j = 0; j < mat->stlpec; j++) {
             float rand_cislo = ((float)rand() / RAND_MAX) * 2.0 - 1.0;
@@ -136,15 +161,6 @@ void mat_print(MAT* mat) { //Vystup prvkov matice (Вивід елементів
     printf("\n");
 }
 
-
-
-void mat_destroy(MAT* mat) { //Uvolnenie pamati (Звільнення пам'яті)
-    free(mat->elem);
-    free(mat);
-}
-
-
-
 MAT* mat_multiply(MAT* mat1, MAT* mat2) { //Vypocet sucinu matic (Вираховування добутку матриць)
     unsigned int m = mat1->riadok;
     unsigned int n = mat1->stlpec;
@@ -152,8 +168,7 @@ MAT* mat_multiply(MAT* mat1, MAT* mat2) { //Vypocet sucinu matic (Вирахов
 
     MAT* result = mat_create_with_type(m, p);
     if (result == NULL) {
-        printf("Chyba: Nepodarilo sa vytvorit maticu pre vysledok.\n");
-        return NULL;
+        return -10;
     }
 
     for (unsigned int i = 0; i < m; i++) { 
@@ -174,8 +189,7 @@ MAT* mat_multiply(MAT* mat1, MAT* mat2) { //Vypocet sucinu matic (Вирахов
 MAT* mat_transpose(const MAT* mat) { //Transponovanie matice (Транспонування матриці)
     MAT* transposed = mat_create_with_type(mat->stlpec, mat->riadok);
     if (transposed == NULL) {
-        printf("Chyba pri vytvarani transponovanej matice.\n");
-        return NULL;
+        return -11;
     }
 
     for (unsigned int i = 0; i < mat->riadok; i++) {
@@ -194,8 +208,7 @@ MAT* mat_orthogonalize(const MAT* mat) {
 
     MAT* orthogonalized = mat_create_with_type(mat->stlpec, mat->riadok);
     if (orthogonalized == NULL) {
-        printf("Chyba pri vytvarani ortogonalizovanej matice.\n");
-        return NULL;
+        return -12;
     }
 
     // Kopirovanie vstupnej matice do novej matice (Копіювання вхідної матриці до нової матриці)
@@ -240,8 +253,9 @@ MAT* mat_orthogonalize(const MAT* mat) {
 
 /*Hladanie charakteristickeho polynomu sa realizuje prostrednictvom principu "Schurovho rozkladu", kde vzorec je Ai+1 = Q*i.A.Q,
 kde Ai+1 je dalsia matica, ktora je podobnejsia hornej trojuholnikovej matici ako Ai, ale tolko do pevneho i, Q je ortogonalizovana matica A a Q* je
-transponovana matica Q. Ide o to, ze mame aj vzorec R = Q*.A, kde R je horna trojuholnikova matica s vlastnymi hodnotami A na diagonale. 
-Iteracie Ai+1 = Q*i.A.Q su potrebne na to, aby sa vlastne hodnoty diagonaly R co najviac priblizili realnym vlastnym hodnotam A*/
+transponovana matica Q. Ide o to, ze koncova A bude mat vlastne cisla originalnej A. 
+Iteracie Ai+1 = Q*i.A.Q su potrebne na to, aby sa vlastne hodnoty diagonaly A co najviac priblizili realnym vlastnym hodnotam A, ak vascsie
+A je podobne do trojholnikovej, tak prvky na jej diagonale je blizsie do vlastnych hodnot zaciatocnej A*/
 char mat_characteristic_polynomial(MAT* mat, float* coef) {
     int i, j, ii, jj;
     unsigned int n = mat->riadok;
@@ -266,7 +280,7 @@ char mat_characteristic_polynomial(MAT* mat, float* coef) {
             }
         }
     }
-    printf("\n k = %i\n", k);
+    //printf("\n k = %i\n", k);
     float presnost = 0.01; // Prahova hodnota presnosti (Порогове значення точності)
 
     // Vykonavanie procesu dosahovania presnosti (Виконання процесу досягнення точності)
@@ -278,30 +292,27 @@ char mat_characteristic_polynomial(MAT* mat, float* coef) {
         A = mat_multiply(T, A);
         A = mat_multiply(A, Q);
         R = mat_multiply(T, A); //Vypocet iteracnych prvkov (Обчислення елементів ітерації)
-        //mat_print(R);
         int je_podobne = 0;
 
-        for (ii = 0; ii < n; ii++) {
+        for (ii = 0; ii < n; ii++) { //pouzivam tu R na overenie presnosti, pretoze zo A cyklus stava velmi velky(prakticke nekonecny)
             for (jj = 0; jj < n; jj++) {
                 if (ii > jj) {
                     if (fabs(ELEM(R, ii, jj)) < presnost)
                         je_podobne++; //Sucet poctu prvkov R pod diagonalou, ktore su mensie ako presnost (Кількість елементів матриці R рід діагоналлю, які менші за коефіцієнт точності)
                 }
-                //coef[ii] = ELEM(R, ii, ii);
             }
         }
         if (je_podobne == k) {
             break; // Zastavenie cyklu po dosiahnuti pozadovanej presnosti (Зупиняємо цикл, якщо досягнута потрібна точність)
         }
     }
-    R = mat_multiply(T, A);
     printf("Iteracia %i je najlepsia, pri ktorej matica R je najviac podobna hornej trojuholnikovej matici s presnostou \"nulovych\" prvkov do %f absolutnej hodnoty,\nA\n", i, presnost);
     mat_print(A);
     for (i = 0; i < n; i++) // Zapis charakterestickeho polynomu
     {
-        coef[i] = ELEM(R, i, i);
+        coef[i] = ELEM(A, i, i);
     }
-    printf("R\n");
+    printf("R\n"); //zaujimave, ze na diagonale R je vlaste cisla A, ale oni su vsetke kladne!!!
     mat_print(R);
 
     mat_destroy(A);
@@ -311,8 +322,55 @@ char mat_characteristic_polynomial(MAT* mat, float* coef) {
     return 1;
 }
 
+int mat_error(int err)
+{
+    switch (err)
+    {
+    case NULL:
+        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu\n");
+        return 0;
+    case -3:
+        printf("Chyba: Otvorenie suboru na zapis zlyhalo\n");
+        return 0;
+    case -4:
+        printf("Chyba: Chyba: Zapis typu matice v subore je nespravny\n");
+        return 0;
+    case -5:
+        printf("Chyba: Matica v subore nie je kvadraticka\n");
+        return 0;
+    case -6:
+        printf("Chyba: Rozmernost matice zo suboru je rozna od vasej\n");
+        return 0;
+    case -7:
+        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu zo suboru\n");
+        return 0;
+    case -8:
+        printf("Chyba: Pocet prvkov matice sa lisi od vasej poziadavky\n");
+        return 0;
+    case -9:
+        printf("Chyba: Otvorenie suboru na ulozenie matice zlyhalo\n");
+        return 0;
+    case -10:
+        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu sucinu\n");
+        return 0;
+    case -11:
+        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu transponovania\n");
+        return 0;
+    case -12:
+        printf("Chyba: Nepodarilo sa pridelit pamat pre maticu ortogonalizacii\n");
+        return 0;
+    case -13:
+        printf("Chyba: Nepodarilo sa pridelit pamat pre zapis matice do tabulky\n");
+        return 0;
+    default:
+        printf("Neznama chyba\n");
+        return 0;
+    }
+}
+
 int main() {
-    int i;
+    srand(time(NULL));
+    int i, chyba;
     char* f = "matica.bin";
     MAT* matica;
     unsigned int riadok, stlpec, var;
@@ -339,14 +397,18 @@ int main() {
         break;
     case 2:
         matica = mat_create_with_type(riadok, stlpec);
-        if (matica == NULL) {
-            printf("Chyba pri vytvarani matice \n");
+        if (matica == -1 || matica == -2) {
+            mat_error(matica);
             return 1;
         }
         mat_unit(matica);
         break;
     case 3:
-        matica = mat_create_by_file(f);
+        matica = mat_create_by_file(f, riadok);
+        if (matica <= -3 && matica >= -8) {
+            mat_error(matica);
+            return 1;
+        }
         if (matica == NULL) {
             printf("Chyba pri vytvarani matice zo suboru \n");
             return 1;
@@ -356,6 +418,8 @@ int main() {
         printf("Nie je to spravna volba, skuste opat \n");
         return main();
     }
+
+    mat_csv(matica, "matica.csv");
 
     // Vystup matice (Виведення матриці) 
     mat_print(matica);
@@ -382,6 +446,7 @@ int main() {
     {
         printf("%6.5f ", coef[i]);
     }
+    printf("\n");
 
     free(coef);
     mat_destroy(matica); //Uvolnenie pamati (Звільнення пам'яті)
