@@ -3,6 +3,8 @@
 Funkcia funguje dobre, nájde najbližšie možné hodnoty vlastných čísel za predpokladu, že tieto čísla sú reálne, 
 pri imaginárnych číslach jednoducho vráti určité reálne číslo, rovnaký princíp hľadania QR alebo Q*AQ
 
+Ak chcete skontrolovať vlastné čísla, použite webovú stránku https://matrixcalc.org/vectors.html, stačí skopírovať maticu z tabuľky matica.csv
+
 Uloha 9.1.14: Okrem ˇstandardnej funkcionality naprogramujte aj funkciu
 • char mat_characteristic_pollynomial(MAT *mat, float* coef);
 ktor´a vypoˇc´ıta koeficienty charakteristick´eho polyn´omu matice mat. Cez argu-
