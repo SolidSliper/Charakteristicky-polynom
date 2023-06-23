@@ -7,8 +7,11 @@ Ak chcete skontrolovať vlastné čísla, použite webovú stránku https://matr
 
 O vzťahu medzi Shurovým rozkladom a vlastnými hodnotami
 https://en.wikipedia.org/wiki/Schur_decomposition
+
 https://web.math.ucsb.edu/~padraic/ucsb_2013_14/math108b_w2014/math108b_w2014_lecture5.pdf
+
 https://netlib.org/lapack/lug/node50.html
+
 https://www.statlect.com/matrix-algebra/Schur-decomposition
 
 Uloha 9.1.14: Okrem ˇstandardnej funkcionality naprogramujte aj funkciu
