@@ -370,25 +370,37 @@ char mat_characteristic_polynomial(MAT* mat, float* coef) {
     }
     printf("Iteracia %i je najlepsia, pri ktorej matica R je najviac podobna hornej trojuholnikovej matici s presnostou \"nulovych\" prvkov do %f absolutnej hodnoty,\nA\n", i, presnost);
     mat_print(A);
-    for (i = 0; i < n; i++) // Vypocet koeficientov charakteristickeho polynomu (Обчислення коефіцієнтів характеристичного поліному)
-    {
-        MAT* lambdaI = mat_create_with_type(n, n);
-        for (j = 0; j < n; j++) {
-            for (k = 0; k < n; k++) {
-                ELEM(lambdaI, j, k) = (j == k) ? ELEM(A, i, i) : 0;
-            }
-        }
-        
-        MAT* diff = mat_subtract(A, lambdaI);
-        float det = mat_determinant(diff);
-
-        coef[i] = det;
-
-        mat_destroy(lambdaI);
-        mat_destroy(diff);
-    }
     printf("R\n"); //zaujimave, ze na diagonale R je vlaste cisla A, ale oni su vsetke kladne!!!
     mat_print(R);
+    coef[n] = 1.0;       
+    coef[n - 1] = 0.0;
+    for(i = 0; i<n; i++)                 //najdeme n-1 coef
+    {
+        coef[n - 1] += -ELEM(A, i, i);
+    }
+
+    coef[0] = 1.0;
+    for (i = 0; i < n; i++)             //najdeme 0 coef
+    {
+        coef[0] *= ELEM(A, i, i);
+    }
+
+    coef[1] = 0.0;                      //najdeme 1 coef
+    float mod = 1000000;
+    for (int i = 0; i < n; i++) {
+        float term = 1;
+        for (int j = 0; j < n; j++) {
+            if (i != j) {
+                term = fmodf(term * -ELEM(A, j, j), mod);
+            }
+        }
+        coef[1] = fmodf(coef[1] + term, mod);
+    }
+
+    for (i = n-2; i > 1; i--)           //nasledujuce coef
+    {
+        coef[i] = coef[i + 1] * ELEM(A, i, i);
+    }
 
     mat_destroy(A);
     mat_destroy(T);
@@ -396,45 +408,6 @@ char mat_characteristic_polynomial(MAT* mat, float* coef) {
     mat_destroy(R);
     return 1;
 }
-
-
-//
-//void mat_characteristic_polynomial(MAT* mat, float* coef) {
-//    unsigned int n = mat->riadok;
-//
-//    if (n != mat->stlpec) {
-//        // Помилка: матриця не є квадратною
-//        return;
-//    }
-//
-//    MAT* identity = mat_create_with_type(n, n);
-//    mat_unit(identity);
-//    MAT* A_minus_lambdaI = mat_subtract(mat, identity);
-//
-//    float det;
-//    for (unsigned int i = 0; i < n; i++) {
-//        MAT* submatrix = mat_create_with_type(n - 1, n - 1);
-//
-//        for (unsigned int j = 1; j < n; j++) {
-//            for (unsigned int k = 0; k < n; k++) {
-//                if (k != i) {
-//                    ELEM(submatrix, j - 1, k < i ? k : k - 1) = ELEM(A_minus_lambdaI, j, k);
-//                }
-//            }
-//        }
-//
-//        det = mat_determinant(submatrix);
-//        coef[i] = -det;
-//
-//        mat_destroy(submatrix);
-//    }
-//
-//    coef[n] = 1.0;
-//
-//    mat_destroy(identity);
-//    mat_destroy(A_minus_lambdaI);
-//}
-
 
 
 int mat_error(int err)
@@ -535,7 +508,7 @@ int main() {
     }
 
     printf("Polynom: ");
-    for (i = 0; i < stlpec; i++)
+    for (i = 0; i < stlpec+1; i++)
     {
         printf("%6.5f ", coef[i]);
     }
